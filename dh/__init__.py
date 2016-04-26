@@ -18,24 +18,18 @@ C2007CB8 A163BF05 98DA4836 1C55D39A 69163FA8 FD24CF5F
 # Convert from the value supplied in the RFC to an integer
 prime = read_hex(raw_prime)
 generator = 2
-their_private = random.getrandbits(256) #their private for testing
-my_private = random.getrandbits(256) #Is this cryptographically secure? There is a StrongRandom class as well but not sure how to use it
+
 # Project TODO: write the appropriate code to perform DH key exchange
-print ("Their private: %i, My Private: %i" % (their_private, my_private))
-def create_dh_key(g, secret, p):
+def create_dh_key():
     # Creates a Diffie-Hellman key
     # Returns (public, private)
-    dh_key = pow(g, secret, prime)
+    my_private = random.getrandbits(256) #Is this cryptographically secure? There is a StrongRandom class as well but not sure how to use it
+    dh_key = pow(generator, my_private, prime)
     return (dh_key, my_private)
-
-my_key = create_dh_key(generator, my_private, prime)[0]
-their_public = create_dh_key(generator, their_private, prime)[0]
-
 
 def calculate_dh_secret(their_public, my_private):
     # Calculate the shared secret
     shared_secret = pow(their_public, my_private, prime)
-    print("Shared Secret %i" % shared_secret)
     # Hash the value so that:
     # (a) There's no bias in the bits of the output
     #     (there may be bias if the shared secret is used raw)
@@ -45,6 +39,3 @@ def calculate_dh_secret(their_public, my_private):
     shared_secret = str(shared_secret)# Convert to string for following command
     shared_hash = SHA256.new(bytes(shared_secret, "ascii")).hexdigest()
     return shared_hash
-
-calculate_dh_secret(their_public, my_private)
-calculate_dh_secret(my_key, their_private)
