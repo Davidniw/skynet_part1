@@ -1,0 +1,10 @@
+Links
+
+First Example of Encypt/Decrypt using AES and Padding
+http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
+
+Second Example of Encypt/Decrypt using AES and Padding
+depado.markdownblog.com/2015-05-11-aes-cipher-with-python-3-x
+
+Effect if different key sizes in AES
+http://crypto.stackexchange.com/questions/3615/what-is-the-effect-of-the-different-aes-key-lengths
