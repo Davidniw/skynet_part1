@@ -45,6 +45,8 @@ def accept_connection(conn):
             echo_server(sconn)
         elif cmd == b'FILE':
             p2p_download_file(sconn)
+        else :
+            print("failed: ", cmd)
     except socket.error:
         print("Connection closed unexpectedly")
 

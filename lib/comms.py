@@ -1,7 +1,7 @@
 import struct
 
 from Crypto.Cipher import XOR
-from Crypto.Random import random
+from Crypto import Random
 import Crypto.Cipher.AES as AES
 import Crypto.Util.Counter
 
@@ -29,16 +29,19 @@ class StealthConn(object):
             their_public_key = int(self.recv())
             # Obtain our shared secret
             shared_hash = calculate_dh_secret(their_public_key, my_private_key)
-            ## iv = random.getrandbits(128) 
+            iv = Random.new().read(AES.block_size)
+            print("IV:", iv)
             print("Shared hash: {}".format(shared_hash))
 
-        # Default XOR algorithm can only take a key of length 32
-        self.cipher = XOR.new(shared_hash[:4]) #needs IV
-        ## self.cipher = AES.new(shared_hash[:4], AES.MODE_CFB) #needs I
+        self.cipher = AES.new(shared_hash[:16], AES.MODE_CBC, iv)
+        
 
     def send(self, data):
         if self.cipher:
-            encrypted_data = self.cipher.encrypt(data)
+            length = 16 - (len(data) % 16)
+            data += bytes([length])*length
+            print("padded data", data)
+            encrypted_data = self.cipher.IV + self.cipher.encrypt(data)
             if self.verbose:
                 print("Original data: {}".format(data))
                 print("Encrypted data: {}".format(repr(encrypted_data)))
@@ -58,8 +61,15 @@ class StealthConn(object):
         pkt_len = unpacked_contents[0]
 
         encrypted_data = self.conn.recv(pkt_len)
+        print("received data: ", encrypted_data)
+        iv = encrypted_data[:16]
+
         if self.cipher:
+            self.cipher.IV = iv
+            print("received iv", iv)
             data = self.cipher.decrypt(encrypted_data)
+            print("decrypted received data", data)
+            data = data[:-data[-1]]
             if self.verbose:
                 print("Receiving packet of length {}".format(pkt_len))
                 print("Encrypted data: {}".format(repr(encrypted_data)))
