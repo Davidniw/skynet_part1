@@ -68,8 +68,8 @@ class StealthConn(object):
             self.cipher.IV = iv
             print("received iv", iv)
             data = self.cipher.decrypt(encrypted_data)
-            print("decrypted received data", data)
-            data = data[:-data[-1]]
+            data = data[16:-data[-1]]
+            print(data)
             if self.verbose:
                 print("Receiving packet of length {}".format(pkt_len))
                 print("Encrypted data: {}".format(repr(encrypted_data)))
