@@ -1,9 +1,10 @@
 import struct
+import Crypto.Cipher.AES as AES
+import Crypto.Util.Counter
+import base64
 
 from Crypto.Cipher import XOR
 from Crypto import Random
-import Crypto.Cipher.AES as AES
-import Crypto.Util.Counter
 
 from dh import create_dh_key, calculate_dh_secret
 
@@ -11,6 +12,7 @@ class StealthConn(object):
     def __init__(self, conn, client=False, server=False, verbose=False):
         self.conn = conn
         self.cipher = None
+        self.key = None
         self.client = client
         self.server = server
         self.verbose = verbose
@@ -29,19 +31,22 @@ class StealthConn(object):
             their_public_key = int(self.recv())
             # Obtain our shared secret
             shared_hash = calculate_dh_secret(their_public_key, my_private_key)
-            iv = Random.new().read(AES.block_size)
-            print("IV:", iv)
             print("Shared hash: {}".format(shared_hash))
-
-        self.cipher = AES.new(shared_hash[:16], AES.MODE_CBC, iv)
-        
+            
+            self.key = shared_hash[:16]
+            IV = Random.new().read(AES.block_size)
+            self.cipher = AES.new(self.key, AES.MODE_CBC, IV)       
+                
+    def pad(self, data):
+        length = 16 - (len(data) % 16)
+        data += bytes([length])*length
+        return data
 
     def send(self, data):
         if self.cipher:
-            length = 16 - (len(data) % 16)
-            data += bytes([length])*length
-            print("padded data", data)
+            data = self.pad(data)
             encrypted_data = self.cipher.IV + self.cipher.encrypt(data)
+            
             if self.verbose:
                 print("Original data: {}".format(data))
                 print("Encrypted data: {}".format(repr(encrypted_data)))
@@ -54,21 +59,22 @@ class StealthConn(object):
         self.conn.sendall(pkt_len)
         self.conn.sendall(encrypted_data)
 
+    def unpad(self, data):
+        data = data[16:-data[-1]]
+        return data
+
     def recv(self):
         # Decode the data's length from an unsigned two byte int ('H')
         pkt_len_packed = self.conn.recv(struct.calcsize('H'))
         unpacked_contents = struct.unpack('H', pkt_len_packed)
         pkt_len = unpacked_contents[0]
+        encrypted_data = self.conn.recv(pkt_len)    
 
-        encrypted_data = self.conn.recv(pkt_len)
-        print("received data: ", encrypted_data)
-        iv = encrypted_data[:16]
+        IV = encrypted_data[:16]
 
-        if self.cipher:
-            self.cipher.IV = iv
-            print("received iv", iv)
+        if self.cipher: 
             data = self.cipher.decrypt(encrypted_data)
-            data = data[16:-data[-1]]
+            data = self.unpad(data)
             print(data)
             if self.verbose:
                 print("Receiving packet of length {}".format(pkt_len))
