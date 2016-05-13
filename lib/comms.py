@@ -3,7 +3,6 @@ import Crypto.Cipher.AES as AES
 import Crypto.Util.Counter
 import base64
 
-from Crypto.Cipher import XOR
 from Crypto import Random
 
 from dh import create_dh_key, calculate_dh_secret
@@ -11,7 +10,6 @@ from dh import create_dh_key, calculate_dh_secret
 class StealthConn(object):
     def __init__(self, conn, client=False, server=False, verbose=False):
         self.conn = conn
-        self.cipher = None
         self.key = None
         self.client = client
         self.server = server
@@ -33,9 +31,8 @@ class StealthConn(object):
             shared_hash = calculate_dh_secret(their_public_key, my_private_key)
             print("Shared hash: {}".format(shared_hash))
             
-            self.key = shared_hash[:16]
-            IV = Random.new().read(AES.block_size)
-            self.cipher = AES.new(self.key, AES.MODE_CBC, IV)       
+            # Set the key to the shared hash (should it always be the first 16?)
+            self.key = shared_hash[:16]     
                 
     def pad(self, data):
         length = 16 - (len(data) % 16)
@@ -43,14 +40,20 @@ class StealthConn(object):
         return data
 
     def send(self, data):
-        if self.cipher:
+        if self.key:
+            # Create random IV and initiate cipher for single message
+            IV = Random.new().read(AES.block_size)
+            cipher = AES.new(self.key, AES.MODE_CBC, IV)
+            # Pad data to be ciphered in blocks
             data = self.pad(data)
-            encrypted_data = self.cipher.IV + self.cipher.encrypt(data)
-            
+            # Send IV appended with encrypted data
+            encrypted_data = IV + cipher.encrypt(data)
+
             if self.verbose:
                 print("Original data: {}".format(data))
                 print("Encrypted data: {}".format(repr(encrypted_data)))
                 print("Sending packet of length {}".format(len(encrypted_data)))
+        
         else:
             encrypted_data = data
 
@@ -60,7 +63,7 @@ class StealthConn(object):
         self.conn.sendall(encrypted_data)
 
     def unpad(self, data):
-        data = data[16:-data[-1]]
+        data = data[:-data[-1]]
         return data
 
     def recv(self):
@@ -70,19 +73,23 @@ class StealthConn(object):
         pkt_len = unpacked_contents[0]
         encrypted_data = self.conn.recv(pkt_len)    
 
-        IV = encrypted_data[:16]
-
-        if self.cipher: 
-            data = self.cipher.decrypt(encrypted_data)
+        if self.key:
+            # Obtain sent IV and initiate cipher for single message
+            IV = encrypted_data[:AES.block_size]
+            cipher = AES.new(self.key, AES.MODE_CBC, IV)
+            # Decrypt the data while ignoring the IV
+            data = cipher.decrypt(encrypted_data[AES.block_size:])
+            # Unpad data to obtain original message
             data = self.unpad(data)
-            print(data)
+
             if self.verbose:
                 print("Receiving packet of length {}".format(pkt_len))
                 print("Encrypted data: {}".format(repr(encrypted_data)))
                 print("Original data: {}".format(data))
+
         else:
             data = encrypted_data
-
+            
         return data
 
     def close(self):
