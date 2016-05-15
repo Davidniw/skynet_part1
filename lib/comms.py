@@ -41,19 +41,23 @@ class StealthConn(object):
 
     def send(self, data):
         if self.key:
+            hash_key = SHA256.new(str(self.key).encode("ascii"))
+            ekey = hash_key.hexdigest()[:32]
+            hkey = hash_key.hexdigest()[32:]
+
             # Create random IV and initiate cipher for single message
             iv = Random.new().read(AES.block_size)
-            cipher = AES.new(self.key[:16], AES.MODE_CBC, iv)
+            cipher = AES.new(ekey[:16], AES.MODE_CBC, iv)
             # Pad data to be ciphered in blocks
             data = self.pad(data)           
             cipher_text = cipher.encrypt(data)
             
             # Initialise HMAC by using 128 bits (48-16=32 --> 32*8=128)
-            hmac = HMAC.new(str(self.key[16:48]).encode("ascii"), digestmod=SHA256)
+            hmac = HMAC.new(str(hkey).encode("ascii"), digestmod=SHA256)
             # h = hash(k[64bit] + cipher)
-            hmac.update(str(self.key[48:56]).encode("ascii") + cipher_text)
+            hmac.update(str(hkey).encode("ascii") + cipher_text)
             # H = hash(k[64bit] + h)
-            hmac.update(str(self.key[56:64]).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
+            hmac.update(str(hkey).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
 
             # Send IV and encrypted data and HMAC
             encrypted_data = iv + cipher_text + str(hmac.hexdigest()).encode("ascii")
@@ -83,16 +87,20 @@ class StealthConn(object):
         encrypted_data = self.conn.recv(pkt_len)    
 
         if self.key:
+            hash_key = SHA256.new(str(self.key).encode("ascii"))
+            ekey = hash_key.hexdigest()[:32]
+            hkey = hash_key.hexdigest()[32:]
+
             # Recalculate HMAC and check if it's identical
-            hmac = HMAC.new(str(self.key[16:48]).encode("ascii"), digestmod=SHA256)
-            hmac.update(str(self.key[48:56]).encode("ascii") + encrypted_data[AES.block_size:32])
-            hmac.update(str(self.key[56:64]).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
+            hmac = HMAC.new(str(hkey).encode("ascii"), digestmod=SHA256)
+            hmac.update(str(hkey).encode("ascii") + encrypted_data[AES.block_size:32])
+            hmac.update(str(hkey).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
 
             if str(hmac.hexdigest()).encode("ascii") == encrypted_data[32:]:
                 print("HMAC confirmed.")
                 # Obtain sent IV and initiate cipher for single message
                 iv = encrypted_data[:AES.block_size]
-                cipher = AES.new(self.key[:16], AES.MODE_CBC, iv)
+                cipher = AES.new(ekey[:16], AES.MODE_CBC, iv)
                 # Decrypt the data while ignoring the IV
                 data = cipher.decrypt(encrypted_data[AES.block_size:32])
                 # Unpad data to obtain original message
