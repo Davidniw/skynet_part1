@@ -1,9 +1,10 @@
 import struct
 import Crypto.Cipher.AES as AES
 import Crypto.Util.Counter
-import base64
 
 from Crypto import Random
+from Crypto.Hash import HMAC
+from Crypto.Hash import SHA256
 
 from dh import create_dh_key, calculate_dh_secret
 
@@ -30,9 +31,8 @@ class StealthConn(object):
             # Obtain our shared secret
             shared_hash = calculate_dh_secret(their_public_key, my_private_key)
             print("Shared hash: {}".format(shared_hash))
-            
             # Set the key to the shared hash (should it always be the first 16?)
-            self.key = shared_hash[:16]     
+            self.key = shared_hash     
                 
     def pad(self, data):
         length = 16 - (len(data) % 16)
@@ -42,12 +42,21 @@ class StealthConn(object):
     def send(self, data):
         if self.key:
             # Create random IV and initiate cipher for single message
-            IV = Random.new().read(AES.block_size)
-            cipher = AES.new(self.key, AES.MODE_CBC, IV)
+            iv = Random.new().read(AES.block_size)
+            cipher = AES.new(self.key[:16], AES.MODE_CBC, iv)
             # Pad data to be ciphered in blocks
-            data = self.pad(data)
-            # Send IV appended with encrypted data
-            encrypted_data = IV + cipher.encrypt(data)
+            data = self.pad(data)           
+            cipher_text = cipher.encrypt(data)
+            
+            # Initialise HMAC by using 128 bits (48-16=32 --> 32*8=128)
+            hmac = HMAC.new(str(self.key[16:48]).encode("ascii"), digestmod=SHA256)
+            # h = hash(k[64bit] + cipher)
+            hmac.update(str(self.key[48:56]).encode("ascii") + cipher_text)
+            # H = hash(k[64bit] + h)
+            hmac.update(str(self.key[56:64]).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
+
+            # Send IV and encrypted data and HMAC
+            encrypted_data = iv + cipher_text + str(hmac.hexdigest()).encode("ascii")
 
             if self.verbose:
                 print("Original data: {}".format(data))
@@ -74,19 +83,32 @@ class StealthConn(object):
         encrypted_data = self.conn.recv(pkt_len)    
 
         if self.key:
-            # Obtain sent IV and initiate cipher for single message
-            IV = encrypted_data[:AES.block_size]
-            cipher = AES.new(self.key, AES.MODE_CBC, IV)
-            # Decrypt the data while ignoring the IV
-            data = cipher.decrypt(encrypted_data[AES.block_size:])
-            # Unpad data to obtain original message
-            data = self.unpad(data)
+            # Recalculate HMAC and check if it's identical
+            hmac = HMAC.new(str(self.key[16:48]).encode("ascii"), digestmod=SHA256)
+            hmac.update(str(self.key[48:56]).encode("ascii") + encrypted_data[AES.block_size:32])
+            hmac.update(str(self.key[56:64]).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
 
-            if self.verbose:
-                print("Receiving packet of length {}".format(pkt_len))
-                print("Encrypted data: {}".format(repr(encrypted_data)))
-                print("Original data: {}".format(data))
+            if str(hmac.hexdigest()).encode("ascii") == encrypted_data[32:]:
+                print("HMAC confirmed.")
+                # Obtain sent IV and initiate cipher for single message
+                iv = encrypted_data[:AES.block_size]
+                cipher = AES.new(self.key[:16], AES.MODE_CBC, iv)
+                # Decrypt the data while ignoring the IV
+                data = cipher.decrypt(encrypted_data[AES.block_size:32])
+                # Unpad data to obtain original message
+                data = self.unpad(data)
 
+                if self.verbose:
+                    print("Receiving packet of length {}".format(pkt_len))
+                    print("Encrypted data: {}".format(repr(encrypted_data)))
+                    print("Original data: {}".format(data))
+
+            else:
+                print("HMAC Modified.")
+                print("Received: ", encrypted_data[32:])
+                print("Calculated: ", str(hmac.hexdigest()).encode("ascii"))
+                data = encrypted_data
+                
         else:
             data = encrypted_data
             
