@@ -41,9 +41,10 @@ class StealthConn(object):
 
     def send(self, data):
         if self.key:
+            # Hash the shared key and split for encrypting and hashing
             hash_key = SHA256.new(str(self.key).encode("ascii"))
             ekey = hash_key.hexdigest()[:32]
-            hkey = hash_key.hexdigest()[32:]
+            hkey = str(hash_key.hexdigest()[32:]).encode("ascii")
 
             # Create random IV and initiate cipher for single message
             iv = Random.new().read(AES.block_size)
@@ -52,12 +53,12 @@ class StealthConn(object):
             data = self.pad(data)           
             cipher_text = cipher.encrypt(data)
             
-            # Initialise HMAC by using 128 bits (48-16=32 --> 32*8=128)
-            hmac = HMAC.new(str(hkey).encode("ascii"), digestmod=SHA256)
+            # Initialise HMAC
+            hmac = HMAC.new(hkey, digestmod=SHA256)
             # h = hash(k[64bit] + cipher)
-            hmac.update(str(hkey).encode("ascii") + cipher_text)
+            hmac.update(hkey + cipher_text)
             # H = hash(k[64bit] + h)
-            hmac.update(str(hkey).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
+            hmac.update(hkey + str(hmac.hexdigest()).encode("ascii"))
 
             # Send IV and encrypted data and HMAC
             encrypted_data = iv + cipher_text + str(hmac.hexdigest()).encode("ascii")
@@ -89,12 +90,12 @@ class StealthConn(object):
         if self.key:
             hash_key = SHA256.new(str(self.key).encode("ascii"))
             ekey = hash_key.hexdigest()[:32]
-            hkey = hash_key.hexdigest()[32:]
+            hkey = str(hash_key.hexdigest()[32:]).encode("ascii")
 
             # Recalculate HMAC and check if it's identical
-            hmac = HMAC.new(str(hkey).encode("ascii"), digestmod=SHA256)
-            hmac.update(str(hkey).encode("ascii") + encrypted_data[AES.block_size:32])
-            hmac.update(str(hkey).encode("ascii") + str(hmac.hexdigest()).encode("ascii"))
+            hmac = HMAC.new(hkey, digestmod=SHA256)
+            hmac.update(hkey + encrypted_data[AES.block_size:32])
+            hmac.update(hkey + str(hmac.hexdigest()).encode("ascii"))
 
             if str(hmac.hexdigest()).encode("ascii") == encrypted_data[32:]:
                 print("HMAC confirmed.")
