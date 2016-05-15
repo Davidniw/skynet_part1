@@ -4,8 +4,7 @@ from lib.helpers import read_hex
 
 # Project TODO: Is this the best choice of prime? Why? Why not? Feel free to replace!
 
-# 3072 bit safe prime for Diffie-Hellman key exchange
-# obtained from RFC 3526
+# 3072 bit safe prime for Diffie-Hellman key exchange obtained from RFC 3526
 raw_prime = """FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
       29024E08 8A67CC74 020BBEA6 3B139B22 514A0879 8E3404DD
       EF9519B3 CD3A431B 302B0A6D F25F1437 4FE1356D 6D51C245
@@ -22,29 +21,35 @@ raw_prime = """FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
       F12FFA06 D98A0864 D8760273 3EC86A64 521F2B18 177B200C
       BBE11757 7A615D6C 770988C0 BAD946E2 08E24FA0 74E5AB31
       43DB5BFC E0FD108E 4B82D120 A93AD2CA FFFFFFFF FFFFFFFF"""
+
 # Convert from the value supplied in the RFC to an integer
 prime = read_hex(raw_prime)
-q = (prime - 1) // 2 #q should be a prime, assuming (3072 bit safe prime - 1) / 2 is also prime
-print(q)
+# q should be a prime, assuming (3072 bit safe prime - 1) / 2 is also prime
+q = (prime - 1) // 2 
+# As defined in RFC for the 3072 bit safe prime
 generator = 2
 
 # Project TODO: write the appropriate code to perform DH key exchange
 def create_dh_key():
     # Creates a Diffie-Hellman key
-    # Returns (public, private)
-    my_private = random.randrange(2, q - 2) #Is this cryptographically secure? There is a StrongRandom class as well but not sure how to use it
+    # Is this cryptographically secure? There is a StrongRandom class and os.urandom as well but not sure how to use it
+    my_private = random.randrange(2, q - 2) 
     dh_key = pow(generator, my_private, prime)
+    # Returns (public, private)
     return (dh_key, my_private)
 
 def calculate_dh_secret(their_public, my_private):
     # Calculate the shared secret
     shared_secret = pow(their_public, my_private, prime)
+    
     # Hash the value so that:
     # (a) There's no bias in the bits of the output
     #     (there may be bias if the shared secret is used raw)
     # (b) We can convert to raw bytes easily
     # (c) We could add additional information if we wanted
     # Feel free to change SHA256 to a different value if more appropriate
-    shared_secret = str(shared_secret)# Convert to string for following command
+    
+    # Convert to string for following command
+    shared_secret = str(shared_secret)
     shared_hash = SHA256.new(bytes(shared_secret, "ascii")).hexdigest()
     return shared_hash

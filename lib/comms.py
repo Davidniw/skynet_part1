@@ -1,3 +1,4 @@
+import random
 import struct
 import Crypto.Cipher.AES as AES
 import Crypto.Util.Counter
@@ -33,6 +34,32 @@ class StealthConn(object):
             print("Shared hash: {}".format(shared_hash))
             # Set the key to the shared hash (should it always be the first 16?)
             self.key = shared_hash     
+
+    def split_key(self, key):
+         # Hash the shared key and split for encrypting, seeding and hashing
+         key = SHA256.new(str(key).encode("ascii"))
+         # Encryption key
+         ekey = key.hexdigest()[:16]
+         # Random key (seed)
+         rkey = key.hexdigest()[16:32]
+         # Hash key
+         hkey = str(key.hexdigest()[32:]).encode("ascii")
+         return ekey, rkey, hkey
+         
+    def gen_random(self, key, min, max):
+        # Generate random nonce from key
+        random.seed(key)
+        random_num = random.randrange(min, max).to_bytes(16, byteorder='big')
+        return random_num
+                   
+    def hash_mac(self, key, cipher):
+         # Initialise HMAC
+         hmac = HMAC.new(key, digestmod=SHA256)
+         # h = hash(key + cipher)
+         hmac.update(key + cipher)
+         # H = hash(key + h)
+         hmac.update(key + str(hmac.hexdigest()).encode("ascii"))
+         return hmac
                 
     def pad(self, data):
         length = 16 - (len(data) % 16)
@@ -41,27 +68,25 @@ class StealthConn(object):
 
     def send(self, data):
         if self.key:
-            # Hash the shared key and split for encrypting and hashing
-            hash_key = SHA256.new(str(self.key).encode("ascii"))
-            ekey = hash_key.hexdigest()[:32]
-            hkey = str(hash_key.hexdigest()[32:]).encode("ascii")
+            # Split the key for use in encryption, random generator and encryption
+            ekey, rkey, hkey = self.split_key(self.key)
+
+            # Generate random nonce to be sent
+            rand_nonce = self.gen_random(rkey, 0, 100000)
 
             # Create random IV and initiate cipher for single message
             iv = Random.new().read(AES.block_size)
-            cipher = AES.new(ekey[:16], AES.MODE_CBC, iv)
+            cipher = AES.new(ekey, AES.MODE_CBC, iv)
+            
             # Pad data to be ciphered in blocks
             data = self.pad(data)           
             cipher_text = cipher.encrypt(data)
             
-            # Initialise HMAC
-            hmac = HMAC.new(hkey, digestmod=SHA256)
-            # h = hash(k[64bit] + cipher)
-            hmac.update(hkey + cipher_text)
-            # H = hash(k[64bit] + h)
-            hmac.update(hkey + str(hmac.hexdigest()).encode("ascii"))
+            # Create HMAC to be sent using key and cipher
+            hmac = self.hash_mac(hkey, cipher_text)
 
-            # Send IV and encrypted data and HMAC
-            encrypted_data = iv + cipher_text + str(hmac.hexdigest()).encode("ascii")
+            # Send IV, encrypted data, HMAC and Nonce
+            encrypted_data = iv + cipher_text + str(hmac.hexdigest()).encode("ascii") + rand_nonce
 
             if self.verbose:
                 print("Original data: {}".format(data))
@@ -88,36 +113,46 @@ class StealthConn(object):
         encrypted_data = self.conn.recv(pkt_len)    
 
         if self.key:
-            hash_key = SHA256.new(str(self.key).encode("ascii"))
-            ekey = hash_key.hexdigest()[:32]
-            hkey = str(hash_key.hexdigest()[32:]).encode("ascii")
+            # Split the key for use in encryption, random generator and encryption
+            ekey, rkey, hkey = self.split_key(self.key)
 
-            # Recalculate HMAC and check if it's identical
-            hmac = HMAC.new(hkey, digestmod=SHA256)
-            hmac.update(hkey + encrypted_data[AES.block_size:32])
-            hmac.update(hkey + str(hmac.hexdigest()).encode("ascii"))
+            # Check if random nonce values are correct
+            if self.gen_random(rkey, 0, 100000) == encrypted_data[96:]:
+                print("Random Nonce confirmed.")
+                
+                # Recalculate HMAC using received values
+                hmac = self.hash_mac(hkey, encrypted_data[AES.block_size:32])
 
-            if str(hmac.hexdigest()).encode("ascii") == encrypted_data[32:]:
-                print("HMAC confirmed.")
-                # Obtain sent IV and initiate cipher for single message
-                iv = encrypted_data[:AES.block_size]
-                cipher = AES.new(ekey[:16], AES.MODE_CBC, iv)
-                # Decrypt the data while ignoring the IV
-                data = cipher.decrypt(encrypted_data[AES.block_size:32])
-                # Unpad data to obtain original message
-                data = self.unpad(data)
+                # Check if HMAC values are equal
+                if str(hmac.hexdigest()).encode("ascii") == encrypted_data[32:96]:
+                    print("HMAC confirmed.")
+                    
+                    # Obtain IV from message
+                    iv = encrypted_data[:AES.block_size]
+                    # Initiate cipher for single message
+                    cipher = AES.new(ekey, AES.MODE_CBC, iv)
+                    # Decrypt the data while ignoring the plaintext IV
+                    data = cipher.decrypt(encrypted_data[AES.block_size:32])
+                    # Unpad data to obtain original message
+                    data = self.unpad(data)
 
-                if self.verbose:
-                    print("Receiving packet of length {}".format(pkt_len))
-                    print("Encrypted data: {}".format(repr(encrypted_data)))
-                    print("Original data: {}".format(data))
+                    if self.verbose:
+                        print("Receiving packet of length {}".format(pkt_len))
+                        print("Encrypted data: {}".format(repr(encrypted_data)))
+                        print("Original data: {}".format(data))
+
+                else:
+                    # HMAC received is not identical to HMAC calculated.
+                    print("HMAC Modified.")
+                    print("Received: ", encrypted_data[32:96])
+                    print("Calculated: ", str(hmac.hexdigest()).encode("ascii"))
 
             else:
-                print("HMAC Modified.")
-                print("Received: ", encrypted_data[32:])
-                print("Calculated: ", str(hmac.hexdigest()).encode("ascii"))
-                data = encrypted_data
-                
+                # Random nonce received is not identical to HMAC calculated.
+                print("Random Nonce not identical.")
+                print("Received: ", encrypted_data[96:])
+                print("Calculated: ", ran_nonce)
+      
         else:
             data = encrypted_data
             
