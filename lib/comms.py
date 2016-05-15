@@ -39,9 +39,9 @@ class StealthConn(object):
          # Hash the shared key and split for encrypting, seeding and hashing
          key = SHA256.new(str(key).encode("ascii"))
          # Encryption key
-         ekey = key.hexdigest()[:16]
+         ekey = key.hexdigest()[:32]
          # Random key (seed)
-         rkey = key.hexdigest()[16:32]
+         rkey = key.hexdigest()[16:48]
          # Hash key
          hkey = str(key.hexdigest()[32:]).encode("ascii")
          return ekey, rkey, hkey
@@ -117,7 +117,8 @@ class StealthConn(object):
             ekey, rkey, hkey = self.split_key(self.key)
 
             # Check if random nonce values are correct
-            if self.gen_random(rkey, 0, 100000) == encrypted_data[96:]:
+            rand_nonce = self.gen_random(rkey, 0, 100000)
+            if rand_nonce == encrypted_data[96:]:
                 print("Random Nonce confirmed.")
                 
                 # Recalculate HMAC using received values
@@ -146,12 +147,14 @@ class StealthConn(object):
                     print("HMAC Modified.")
                     print("Received: ", encrypted_data[32:96])
                     print("Calculated: ", str(hmac.hexdigest()).encode("ascii"))
+                    data = encrypted_data
 
             else:
                 # Random nonce received is not identical to HMAC calculated.
                 print("Random Nonce not identical.")
                 print("Received: ", encrypted_data[96:])
-                print("Calculated: ", ran_nonce)
+                print("Calculated: ", rand_nonce)
+                data = encrypted_data
       
         else:
             data = encrypted_data
