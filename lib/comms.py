@@ -6,6 +6,7 @@ import Crypto.Util.Counter
 from Crypto import Random
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
+from Crypto.Hash import SHA512
 
 from dh import create_dh_key, calculate_dh_secret
 
@@ -37,21 +38,23 @@ class StealthConn(object):
 
     def split_key(self, key):
          # Hash the shared key and split for encrypting, seeding and hashing
-         key = SHA256.new(str(key).encode("ascii"))
+         key = SHA512.new(str(key).encode("ascii"))
          # Encryption key
          ekey = key.hexdigest()[:32]
          # Random key (seed)
-         rkey = key.hexdigest()[16:48]
+         rkey = key.hexdigest()[32:80]
          # Hash key
-         hkey = str(key.hexdigest()[32:]).encode("ascii")
+         hkey = str(key.hexdigest()[80:]).encode("ascii")
          return ekey, rkey, hkey
          
     def gen_random(self, key, min, max):
         # Generate random nonce from key
         random.seed(key)
         random_num = random.randrange(min, max).to_bytes(16, byteorder='big')
-        return random_num
-                   
+        #random_num = SHA256.new(random_num)
+        #return random_num.hexdigest()[:8]
+        return random_num 
+                  
     def hash_mac(self, key, cipher):
          # Initialise HMAC
          hmac = HMAC.new(key, digestmod=SHA256)
@@ -72,7 +75,7 @@ class StealthConn(object):
             ekey, rkey, hkey = self.split_key(self.key)
 
             # Generate random nonce to be sent
-            rand_nonce = self.gen_random(rkey, 0, 100000)
+            rand_nonce = self.gen_random(rkey, 0, pow(8,16))
 
             # Create random IV and initiate cipher for single message
             iv = Random.new().read(AES.block_size)
@@ -110,6 +113,7 @@ class StealthConn(object):
         pkt_len_packed = self.conn.recv(struct.calcsize('H'))
         unpacked_contents = struct.unpack('H', pkt_len_packed)
         pkt_len = unpacked_contents[0]
+        print(pkt_len)
         encrypted_data = self.conn.recv(pkt_len)    
 
         if self.key:
@@ -117,15 +121,15 @@ class StealthConn(object):
             ekey, rkey, hkey = self.split_key(self.key)
 
             # Check if random nonce values are correct
-            rand_nonce = self.gen_random(rkey, 0, 100000)
-            if rand_nonce == encrypted_data[96:]:
+            rand_nonce = self.gen_random(rkey, 0, pow(8,16))
+            if rand_nonce == encrypted_data[-16:]:
                 print("Random Nonce confirmed.")
                 
                 # Recalculate HMAC using received values
                 hmac = self.hash_mac(hkey, encrypted_data[AES.block_size:32])
 
                 # Check if HMAC values are equal
-                if str(hmac.hexdigest()).encode("ascii") == encrypted_data[32:96]:
+                if str(hmac.hexdigest()).encode("ascii") == encrypted_data[-80:-16]:
                     print("HMAC confirmed.")
                     
                     # Obtain IV from message
@@ -133,7 +137,7 @@ class StealthConn(object):
                     # Initiate cipher for single message
                     cipher = AES.new(ekey, AES.MODE_CBC, iv)
                     # Decrypt the data while ignoring the plaintext IV
-                    data = cipher.decrypt(encrypted_data[AES.block_size:32])
+                    data = cipher.decrypt(encrypted_data[AES.block_size:-80])
                     # Unpad data to obtain original message
                     data = self.unpad(data)
 
