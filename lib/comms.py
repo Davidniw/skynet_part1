@@ -21,7 +21,6 @@ class StealthConn(object):
 
     def initiate_session(self):
         # Perform the initial connection handshake for agreeing on a shared secret
-
         ### TODO: Your code here!
         # This can be broken into code run just on the server or just on the client
         if self.server or self.client:
@@ -64,9 +63,9 @@ class StealthConn(object):
          hmac.update(key + str(hmac.hexdigest()).encode("ascii"))
          return hmac
                 
-# ANSI X.923 pads the message with zeroes
-# The last byte is the number of zeroes added
-# This should be checked on unpadding
+    # ANSI X.923 pads the message with zeroes
+    # The last byte is the number of zeroes added
+    # This should be checked on unpadding
     def ANSI_X923_pad(self, m, pad_length):
         # Work out how many bytes need to be added
         required_padding = pad_length - (len(m) % pad_length)
@@ -87,7 +86,6 @@ class StealthConn(object):
         else:
             # Raise an exception in the case of an invalid padding
             raise AssertionError("Padding was invalid")
-
 
     def send(self, data):
         if self.key:
