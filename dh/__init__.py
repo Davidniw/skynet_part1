@@ -1,6 +1,6 @@
-from Crypto.Hash import SHA256
-from Crypto.Random import random
+from Crypto.Hash import SHA512
 from lib.helpers import read_hex
+from random import SystemRandom
 
 # Project TODO: Is this the best choice of prime? Why? Why not? Feel free to replace!
 
@@ -33,7 +33,8 @@ generator = 2
 def create_dh_key():
     # Creates a Diffie-Hellman key
     # Is this cryptographically secure? There is a StrongRandom class and os.urandom as well but not sure how to use it
-    my_private = random.randrange(2, q - 2) 
+    crypt_random = SystemRandom
+    my_private = crypt_random.randrange(SystemRandom(), 2, q-2)
     dh_key = pow(generator, my_private, prime)
     # Returns (public, private)
     return (dh_key, my_private)
@@ -51,5 +52,5 @@ def calculate_dh_secret(their_public, my_private):
     
     # Convert to string for following command
     shared_secret = str(shared_secret)
-    shared_hash = SHA256.new(bytes(shared_secret, "ascii")).hexdigest()
+    shared_hash = SHA512.new(bytes(shared_secret, "ascii")).hexdigest()
     return shared_hash

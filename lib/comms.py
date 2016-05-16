@@ -64,10 +64,30 @@ class StealthConn(object):
          hmac.update(key + str(hmac.hexdigest()).encode("ascii"))
          return hmac
                 
-    def pad(self, data):
-        length = 16 - (len(data) % 16)
-        data += bytes([length])*length
-        return data
+# ANSI X.923 pads the message with zeroes
+# The last byte is the number of zeroes added
+# This should be checked on unpadding
+    def ANSI_X923_pad(self, m, pad_length):
+        # Work out how many bytes need to be added
+        required_padding = pad_length - (len(m) % pad_length)
+        # Use a bytearray so we can add to the end of m
+        b = bytearray(m)
+        # Then k-1 zero bytes, where k is the required padding
+        b.extend(bytes("\x00" * (required_padding-1), "ascii"))
+        # And finally adding the number of padding bytes added
+        b.append(required_padding)
+        return bytes(b)
+
+    def ANSI_X923_unpad(self, m, pad_length):
+        # The last byte should represent the number of padding bytes added
+        required_padding = m[-1]
+        # Ensure that there are required_padding - 1 zero bytes
+        if m.count(bytes([0]), -required_padding, -1) == required_padding - 1:
+            return m[:-required_padding]
+        else:
+            # Raise an exception in the case of an invalid padding
+            raise AssertionError("Padding was invalid")
+
 
     def send(self, data):
         if self.key:
@@ -82,7 +102,7 @@ class StealthConn(object):
             cipher = AES.new(ekey, AES.MODE_CBC, iv)
             
             # Pad data to be ciphered in blocks
-            data = self.pad(data)           
+            data = self.ANSI_X923_pad(data, AES.block_size)           
             cipher_text = cipher.encrypt(data)
             
             # Create HMAC to be sent using key and cipher
@@ -104,16 +124,11 @@ class StealthConn(object):
         self.conn.sendall(pkt_len)
         self.conn.sendall(encrypted_data)
 
-    def unpad(self, data):
-        data = data[:-data[-1]]
-        return data
-
     def recv(self):
         # Decode the data's length from an unsigned two byte int ('H')
         pkt_len_packed = self.conn.recv(struct.calcsize('H'))
         unpacked_contents = struct.unpack('H', pkt_len_packed)
         pkt_len = unpacked_contents[0]
-        print(pkt_len)
         encrypted_data = self.conn.recv(pkt_len)    
 
         if self.key:
@@ -124,22 +139,22 @@ class StealthConn(object):
             rand_nonce = self.gen_random(rkey, 0, pow(8,16))
             if rand_nonce == encrypted_data[-16:]:
                 print("Random Nonce confirmed.")
-                
+
                 # Recalculate HMAC using received values
-                hmac = self.hash_mac(hkey, encrypted_data[AES.block_size:32])
+                hmac = self.hash_mac(hkey, encrypted_data[16:-80])
 
                 # Check if HMAC values are equal
                 if str(hmac.hexdigest()).encode("ascii") == encrypted_data[-80:-16]:
                     print("HMAC confirmed.")
                     
                     # Obtain IV from message
-                    iv = encrypted_data[:AES.block_size]
+                    iv = encrypted_data[:16]
                     # Initiate cipher for single message
                     cipher = AES.new(ekey, AES.MODE_CBC, iv)
                     # Decrypt the data while ignoring the plaintext IV
-                    data = cipher.decrypt(encrypted_data[AES.block_size:-80])
+                    data = cipher.decrypt(encrypted_data[16:-80])
                     # Unpad data to obtain original message
-                    data = self.unpad(data)
+                    data = self.ANSI_X923_unpad(data, AES.block_size)
 
                     if self.verbose:
                         print("Receiving packet of length {}".format(pkt_len))
