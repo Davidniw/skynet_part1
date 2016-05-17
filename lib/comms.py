@@ -89,7 +89,7 @@ class StealthConn(object):
             ekey, rkey, hkey = self.split_key(self.key)
 
             # Generate random nonce to be sent
-            rand_nonce = self.gen_random(rkey, 0, pow(8,16))
+            rand_nonce = self.gen_random(rkey, 0, pow(2,128))
 
             # Create random IV and initiate cipher for single message
             iv = Random.new().read(AES.block_size)
@@ -130,7 +130,7 @@ class StealthConn(object):
             ekey, rkey, hkey = self.split_key(self.key)
 
             # Check if random nonce values are correct
-            rand_nonce = self.gen_random(rkey, 0, pow(8,16))
+            rand_nonce = self.gen_random(rkey, 0, pow(2,128))
             if rand_nonce == encrypted_data[-16:]:
                 print("Random Nonce confirmed.")
 
