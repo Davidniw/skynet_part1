@@ -57,10 +57,7 @@ class StealthConn(object):
     def hash_mac(self, key, cipher):
          # Initialise HMAC
          hmac = HMAC.new(key, digestmod=SHA256)
-         # h = hash(key + cipher)
-         hmac.update(key + cipher)
-         # H = hash(key + h)
-         hmac.update(key + str(hmac.hexdigest()).encode("ascii"))
+         hmac.update(str(cipher).encode("ascii"))
          return hmac
                 
     # ANSI X.923 pads the message with zeroes
@@ -101,13 +98,13 @@ class StealthConn(object):
             
             # Pad data to be ciphered in blocks
             data = self.ANSI_X923_pad(data, AES.block_size)           
-            cipher_text = cipher.encrypt(data)
+            ciphertext = cipher.encrypt(data)
             
             # Create HMAC to be sent using key and cipher
-            hmac = self.hash_mac(hkey, cipher_text)
+            hmac = self.hash_mac(hkey, ciphertext)
 
             # Send IV, encrypted data, HMAC and Nonce
-            encrypted_data = iv + cipher_text + str(hmac.hexdigest()).encode("ascii") + rand_nonce
+            encrypted_data = iv + ciphertext + str(hmac.hexdigest()).encode("ascii") + rand_nonce
 
             if self.verbose:
                 print("Original data: {}".format(data))
