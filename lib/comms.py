@@ -1,7 +1,6 @@
 import random
 import struct
 import Crypto.Cipher.AES as AES
-import Crypto.Util.Counter
 
 from Crypto import Random
 from Crypto.Hash import HMAC
