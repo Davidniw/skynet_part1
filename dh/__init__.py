@@ -34,7 +34,7 @@ generator = 2
 # Project TODO: write the appropriate code to perform DH key exchange
 def create_dh_key():
     # Creates a Diffie-Hellman key
-    # Is this cryptographically secure? There is a StrongRandom class and os.urandom as well but not sure how to use it
+    # Is this cryptographically secure?
     my_private = Random.random.randrange(2, q-2)
     dh_key = pow(generator, my_private, prime)
     # Returns (public, private)
