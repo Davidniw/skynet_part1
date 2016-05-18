@@ -36,13 +36,13 @@ class StealthConn(object):
 
     def split_key(self, key):
          # Hash the shared key and split for encrypting, seeding and hashing
-         key = SHA512.new(str(key).encode("ascii"))
+         key = SHA256.new(str(key).encode("ascii"))
          # Encryption key
-         ekey = key.hexdigest()[:32]
+         ekey = key.hexdigest()[:16]
          # Random key (seed)
-         rkey = key.hexdigest()[32:80]
+         rkey = key.hexdigest()[16:40]
          # Hash key
-         hkey = str(key.hexdigest()[80:]).encode("ascii")
+         hkey = str(key.hexdigest()[40:]).encode("ascii")
          return ekey, rkey, hkey
          
     def gen_random(self, key, min, max):
