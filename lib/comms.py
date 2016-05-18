@@ -157,7 +157,7 @@ class StealthConn(object):
                 else:
                     # HMAC received is not identical to HMAC calculated.
                     print("HMAC Modified.")
-                    print("Received: ", encrypted_data[32:96])
+                    print("Received: ", encrypted_data[-128:-64])
                     print("Calculated: ", str(hmac.hexdigest()).encode("ascii"))
                     data = encrypted_data
 
