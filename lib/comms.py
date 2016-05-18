@@ -5,7 +5,6 @@ import Crypto.Cipher.AES as AES
 from Crypto import Random
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
-from Crypto.Hash import SHA512
 
 from dh import create_dh_key, calculate_dh_secret
 
