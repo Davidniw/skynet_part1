@@ -6,7 +6,7 @@ from lib.helpers import read_hex
 
 # Project TODO: Is this the best choice of prime? Why? Why not? Feel free to replace!
 
-# 3072 bit safe prime for Diffie-Hellman key exchange obtained from RFC 3526
+# 4096 bit safe prime for Diffie-Hellman key exchange obtained from RFC 3526
 raw_prime = """FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
       29024E08 8A67CC74 020BBEA6 3B139B22 514A0879 8E3404DD
       EF9519B3 CD3A431B 302B0A6D F25F1437 4FE1356D 6D51C245
@@ -22,13 +22,19 @@ raw_prime = """FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
       ABF5AE8C DB0933D7 1E8C94E0 4A25619D CEE3D226 1AD2EE6B
       F12FFA06 D98A0864 D8760273 3EC86A64 521F2B18 177B200C
       BBE11757 7A615D6C 770988C0 BAD946E2 08E24FA0 74E5AB31
-      43DB5BFC E0FD108E 4B82D120 A93AD2CA FFFFFFFF FFFFFFFF"""
+      43DB5BFC E0FD108E 4B82D120 A9210801 1A723C12 A787E6D7
+      88719A10 BDBA5B26 99C32718 6AF4E23C 1A946834 B6150BDA
+      2583E9CA 2AD44CE8 DBBBC2DB 04DE8EF9 2E8EFC14 1FBECAA6
+      287C5947 4E6BC05D 99B2964F A090C3A2 233BA186 515BE7ED
+      1F612970 CEE2D7AF B81BDD76 2170481C D0069127 D5B05AA9
+      93B4EA98 8D8FDDC1 86FFB7DC 90A6C08F 4DF435C9 34063199
+      FFFFFFFF FFFFFFFF"""
 
 # Convert from the value supplied in the RFC to an integer
 prime = read_hex(raw_prime)
-# q should be a prime, assuming (3072 bit safe prime - 1) / 2 is also prime
+# q should be a prime, assuming (4096 bit safe prime - 1) / 2 is also prime
 q = (prime - 1) // 2 
-# As defined in RFC for the 3072 bit safe prime
+# As defined in RFC for the 4096 bit safe prime
 generator = 2
 
 # Project TODO: write the appropriate code to perform DH key exchange

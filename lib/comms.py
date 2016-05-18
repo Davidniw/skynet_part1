@@ -90,10 +90,9 @@ class StealthConn(object):
             # Generate random nonce to be sent
             rand_nonce = self.gen_random(rkey, 0, pow(2,128))
 
-            # Create random IV and initiate cipher for single message
+            # Excrypt data using AES
             iv = Random.new().read(AES.block_size)
             cipher = AES.new(ekey, AES.MODE_CBC, iv)
-            
             # Pad data to be ciphered in blocks
             data = self.ANSI_X923_pad(data, AES.block_size)           
             ciphertext = cipher.encrypt(data)
@@ -142,9 +141,8 @@ class StealthConn(object):
                     
                     # Obtain IV from message
                     iv = encrypted_data[:16]
-                    # Initiate cipher for single message
+                    # Decrypt ciphertext from message
                     cipher = AES.new(ekey, AES.MODE_CBC, iv)
-                    # Decrypt the data while ignoring the plaintext IV
                     data = cipher.decrypt(encrypted_data[16:-128])
                     # Unpad data to obtain original message
                     data = self.ANSI_X923_unpad(data, AES.block_size)
