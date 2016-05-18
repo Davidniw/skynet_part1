@@ -48,10 +48,10 @@ class StealthConn(object):
     def gen_random(self, key, min, max):
         # Generate random nonce from key
         random.seed(key)
-        random_num = random.randrange(min, max).to_bytes(16, byteorder='big')
-        #random_num = SHA256.new(random_num)
-        #return random_num.hexdigest()[:8]
-        return random_num 
+        r = random.randrange(min, max).to_bytes(16, byteorder='big')
+        random_num = SHA256.new(r)
+        return str(random_num.hexdigest()).encode("ascii")
+        #return random_num 
                   
     def hash_mac(self, key, cipher):
          # Initialise HMAC
@@ -131,14 +131,14 @@ class StealthConn(object):
 
             # Check if random nonce values are correct
             rand_nonce = self.gen_random(rkey, 0, pow(2,128))
-            if rand_nonce == encrypted_data[-16:]:
+            if rand_nonce == encrypted_data[96:]:
                 print("Random Nonce confirmed.")
 
                 # Recalculate HMAC using received values
-                hmac = self.hash_mac(hkey, encrypted_data[16:-80])
+                hmac = self.hash_mac(hkey, encrypted_data[16:-128])
 
                 # Check if HMAC values are equal
-                if str(hmac.hexdigest()).encode("ascii") == encrypted_data[-80:-16]:
+                if str(hmac.hexdigest()).encode("ascii") == encrypted_data[-128:-64]:
                     print("HMAC confirmed.")
                     
                     # Obtain IV from message
@@ -146,7 +146,7 @@ class StealthConn(object):
                     # Initiate cipher for single message
                     cipher = AES.new(ekey, AES.MODE_CBC, iv)
                     # Decrypt the data while ignoring the plaintext IV
-                    data = cipher.decrypt(encrypted_data[16:-80])
+                    data = cipher.decrypt(encrypted_data[16:-128])
                     # Unpad data to obtain original message
                     data = self.ANSI_X923_unpad(data, AES.block_size)
 
