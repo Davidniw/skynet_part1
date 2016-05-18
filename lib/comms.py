@@ -130,7 +130,7 @@ class StealthConn(object):
 
             # Check if random nonce values are correct
             rand_nonce = self.gen_random(rkey, 0, pow(2,128))
-            if rand_nonce == encrypted_data[96:]:
+            if rand_nonce == encrypted_data[-64:]:
                 print("Random Nonce confirmed.")
 
                 # Recalculate HMAC using received values
@@ -164,7 +164,7 @@ class StealthConn(object):
             else:
                 # Random nonce received is not identical to HMAC calculated.
                 print("Random Nonce not identical.")
-                print("Received: ", encrypted_data[96:])
+                print("Received: ", encrypted_data[-64:])
                 print("Calculated: ", rand_nonce)
                 data = encrypted_data
       
